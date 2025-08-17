@@ -151,6 +151,43 @@ var prev_random_scanline_counter = 0;
 
 var pokey_filter = new Array(1, 1, 0, 0);
 
+// --- Trace scaffolding (timestamps + buffer) ---
+let TRACE_ENABLED = false;
+let TRACE_ROWS = [];
+const TRACE_FLUSH_THRESHOLD = 8192;   // auto-dump when buffer gets big
+
+let trace_frames = 0;
+let trace_lastFrameTS = 0;
+let trace_cyclesPerFrame = 0;
+
+function nowTS() {
+  // Emu-time: scanline accumulator + CPU cycles into this scanline
+  // (ProSystem.GetCycles() already exists – used in pokey_GetRegister)
+  return (random_scanline_counter + ProSystem.GetCycles()) | 0;
+}
+
+function dumpTrace(filename) {
+  const meta = [
+    "# pokey_trace",
+    `# cycles_per_scanline=${CYCLES_PER_SCANLINE}`,
+    `# cycles_per_frame=${trace_cyclesPerFrame}`,
+    `# frames=${trace_frames}`
+  ].join("\n");
+  const header = "ts,address,reg,val\n";
+  const blob = new Blob([meta, "\n", header, TRACE_ROWS.join("\n"), "\n"], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename || `pokey_trace_${Date.now()}.csv`;
+  a.click();
+  TRACE_ROWS.length = 0;
+}
+
+
+// tiny public helpers
+function EnableTrace(on = true) { TRACE_ENABLED = !!on; }
+function DumpTrace(name) { dumpTrace(name); }
+
+
 //static void rand_init(byte *rng, int size, int left, int right, int add)
 function rand_init(rng, size, left, right, add) {
   //int mask = (1 << size) - 1;
@@ -266,11 +303,18 @@ function pokey_Reset() {
   pokey_filter[3] = 0;
 
   pokey_Clear(true);
+
+  trace_frames = 0;
+  trace_lastFrameTS = nowTS();
+  trace_cyclesPerFrame = 0;
 }
 
 /* Called prior to each frame */
 //void pokey_Frame() {
 function pokey_Frame() {
+  const ts = nowTS();
+  if (trace_frames++) trace_cyclesPerFrame = ts - trace_lastFrameTS;
+  trace_lastFrameTS = ts;
 }
 
 /* Called prior to each scanline */
@@ -348,8 +392,19 @@ const registers = Array(32);
 // SetRegister
 // ----------------------------------------------------------------------------
 function pokey_SetRegister(address, value) {
-  if ((pokey_debug_count--) > 0)
-    console.log("pokey_setRegister: %d %d", address - 0x4000, value);
+  // Timestamp & quick buffer push
+  if (TRACE_ENABLED) {
+    const ts = nowTS();
+    const reg = (address & 0x0f) >>> 0;
+    TRACE_ROWS.push(`${ts},0x${address.toString(16)},${reg},${value & 0xff}`);
+    if (TRACE_ROWS.length >= TRACE_FLUSH_THRESHOLD) {
+      // we'll add dumpTrace() in the next step; for now just trim pressure
+      TRACE_ROWS.length = 0;
+    }
+  }
+
+  // if ((pokey_debug_count--) > 0)
+  //   console.log("pokey_setRegister: %d %d", address - 0x4000, value);
   registers[address - 0x4000] = value;
 
   switch (address) {
@@ -584,6 +639,15 @@ function SetCyclesPerScanline(cycles) {
   CYCLES_PER_SCANLINE = cycles;
 }
 
+// expose debug helpers to the browser console
+if (typeof window !== "undefined") {
+  window.POKEY_DBG = {
+    on: () => EnableTrace(true),
+    off: () => EnableTrace(false),
+    dump: (name) => DumpTrace(name)
+  };
+}
+
 export {
   pokey_Clear as Clear,
   pokey_Process as Process,
@@ -595,5 +659,7 @@ export {
   pokey_Scanline as Scanline,
   pokey_buffer as buffer,
   SetCyclesPerScanline,
-  registers
+  registers,
+  EnableTrace,
+  DumpTrace
 }
