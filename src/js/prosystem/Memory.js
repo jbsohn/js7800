@@ -28,6 +28,7 @@ import * as Pokey from "./Pokey.js"
 import * as Cartridge from "./Cartridge.js"
 import * as Riot from "./Riot.js"
 import * as Tia from "./Tia.js"
+import * as Ym2149 from "./Ym2149.js"
 import * as Bios from "./Bios.js"
 import * as Events from "../events.js"
 
@@ -98,6 +99,7 @@ var cartridge_pokey450 = false;
 
 // banksets changes
 var cartridge_pokey800 = false;
+var cartridge_ym2149 = false;
 var cartridge_pokey_write_only = false;
 var cartridge_banksets = false;
 var cartridge_halt_banked_ram = false;
@@ -248,6 +250,13 @@ function memory_Write(address, data) {
         (xm_IsYmEnabled() && (address >= 0x0460 && address <= 0x0461)))) {
     xm_Write(address, data);
     return;
+  }
+
+  if (cartridge_ym2149 && (address == 0x4000 || address == 0x4001)) {
+    if (address == 0x4000) Ym2149.WriteAddress(data);
+    else Ym2149.WriteData(data);
+    // If pokey is also at $4000, it doesn't get these two registers.
+    if (cartridge_pokey && !cartridge_pokey450 && !cartridge_pokey800) return;
   }
 
   // banksets changes (pokey@800)
@@ -469,6 +478,7 @@ function OnCartridgeLoaded() {
   cartridge_pokey = Cartridge.IsPokeyEnabled();
   cartridge_pokey450 = Cartridge.IsPokey450Enabled();
   cartridge_pokey800 = Cartridge.IsPokey800Enabled();
+  cartridge_ym2149 = Cartridge.IsYm2149Enabled();
   cartridge_xm = Cartridge.IsXmEnabled();
   cartridge_flags = Cartridge.GetFlags();
   cartridge_pokey_write_only = Cartridge.IsPokeyWriteOnly();

@@ -68,6 +68,17 @@ module.exports = {
                 throw "Failed copy to site: " + src
               }
             });
+          
+          let src_aym = path.resolve(__dirname, 'src/js/3rdparty/aym-emulator.js');
+          let dst_aym = path.resolve(__dirname, 'site/deploy/js/aym-emulator.js');
+          fs.copyFile(src_aym, dst_aym,
+            err => {
+              if (!err) {
+                console.log("Copied aym-emulator to site: " + src_aym);
+              } else {
+                throw "Failed copy aym-emulator to site: " + src_aym
+              }
+            });
         });
       }
     }

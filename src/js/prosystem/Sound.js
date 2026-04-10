@@ -25,6 +25,7 @@
 
 import * as ProSystem from "./ProSystem.js"
 import * as Pokey from "./Pokey.js"
+import * as Ym2149 from "./Ym2149.js"
 import * as Xm from "./Xm.js"
 import * as Cartridge from "./Cartridge.js"
 import * as Tia from "./Tia.js"
@@ -33,6 +34,8 @@ import * as YM from "../3rdparty/ym2151.js"
 
 var pokey_buffer = Pokey.buffer;
 var pokey_Clear = Pokey.Clear;
+var ym2149_buffer = Ym2149.buffer;
+var ym2149_Clear = Ym2149.Clear;
 var tia_buffer = Tia.buffer;
 var tia_Clear = Tia.Clear;
 var xm_IsPokeyEnabled = Xm.IsPokeyEnabled;
@@ -47,8 +50,9 @@ var prosystem_frequency = 0;
 var prosystem_scanlines = 0;
 var prosystem_sampleRate = 0;
 
-/** Shadow of Cartridge */  
+/** Shadow of Cartridge */
 var cartridge_pokey = false;
+var cartridge_ym2149 = false;
 var cartridge_bupchip = false;
 
 // /* LUDO: */
@@ -103,18 +107,18 @@ function sound_GetSampleLength(length, unit, unitMax) {
 // Resample
 // ----------------------------------------------------------------------------
 //static void sound_Resample(const byte* source, byte* target, int length) {
-function sound_Resample(tia, pokey, target, length) {
+function sound_Resample(tia, pokey, ym2149, target, length) {
   var measurement = prosystem_sampleRate;
   var sourceIndex = 0;
   var targetIndex = 0;
 
-//  var max = 31440;
+  //  var max = 31440;
   var max = ((prosystem_frequency * prosystem_scanlines) << 1);
 
 
   while (targetIndex < length) {
     if (measurement >= max) {
-      target[targetIndex++] = tia[sourceIndex] + (pokey ? pokey[sourceIndex] : 0);      
+      target[targetIndex++] = tia[sourceIndex] + (pokey ? pokey[sourceIndex] : 0) + (ym2149 ? ym2149[sourceIndex] : 0);
       measurement -= max;
     } else {
       sourceIndex++;
@@ -154,10 +158,14 @@ function sound_Store() {
   var ym = xm_IsYmEnabled();
   var prosystem_frame = prosystem_GetFrame();
 
+  if (prosystem_frequency <= 0) return true;
+
   var length = sound_GetSampleLength(
-    prosystem_sampleRate, prosystem_frame, prosystem_frequency);   
-    
-  sound_Resample(tia_buffer, (pokey ? pokey_buffer : null), sample, length);
+    prosystem_sampleRate, prosystem_frame, prosystem_frequency);
+
+  if (length <= 0) return true;
+
+  sound_Resample(tia_buffer, (pokey ? pokey_buffer : null), (cartridge_ym2149 ? ym2149_buffer : null), sample, length);
 
   if (cartridge_bupchip) {
     let bupBuffer = new Int16Array(Module.HEAP16.buffer, window.Module._bupchip_GetBupChipBuffer(), length << 1);
@@ -166,16 +174,17 @@ function sound_Store() {
       let n = (bupBuffer[i * 2]);
       if (n !== undefined) {
         sample[i] = ((n / 32768) + (bupBuffer[i * 2 + 1] / 32768)) / 2;
-      }  else {
+      } else {
         sample[i] = 0;
-      }      
+      }
       sample[i] = ((curr * .4) + (sample[i] * .6));
       sample[i] *= 255;
     }
   }
 
-   tia_Clear();
-   pokey_Clear();
+  tia_Clear();
+  pokey_Clear();
+  ym2149_Clear();
 
   if (ym) {
     YM.mixStereo(ymBuffer, length, 0);
@@ -207,47 +216,10 @@ function sound_Stop() {
 }
 
 // ----------------------------------------------------------------------------
-// SetSampleRate
-// ----------------------------------------------------------------------------
-//bool sound_SetSampleRate(uint rate) {
-/*
-function sound_SetSampleRate(rate) {  
-  sound_format.nSamplesPerSec = rate;
-  sound_format.nAvgBytesPerSec = rate;
-  return sound_SetFormat(sound_format);
-}
-*/
-
-// ----------------------------------------------------------------------------
-// GetSampleRate
-// ----------------------------------------------------------------------------
-//uint sound_GetSampleRate() {
-/*
-function sound_GetSampleRate() {  
-  return sound_format.nSamplesPerSec;
-}
-*/
-
-// ----------------------------------------------------------------------------
 // SetMuted
 // ----------------------------------------------------------------------------
 //bool sound_SetMuted(bool muted) {
 function sound_SetMuted(muted) {
-  /*
-  if (sound_muted != muted) {
-    if (!muted) {
-      if (!sound_Play()) {
-        return false;
-      }
-    }
-    else {
-      if (!sound_Stop()) {
-        return false;
-      }
-    }
-    sound_muted = muted;
-  }
-  */
   sound_muted = muted;
   return true;
 }
@@ -260,30 +232,34 @@ function sound_IsMuted() {
   return sound_muted;
 }
 
-function SetFrequency(freq) { 
-  prosystem_frequency = freq; 
+function SetFrequency(freq) {
+  prosystem_frequency = freq;
+  Ym2149.SetSampleRate(prosystem_frequency, prosystem_scanlines);
 }
 
-function SetScanlines(lines) { 
-  prosystem_scanlines = lines 
+function SetScanlines(lines) {
+  prosystem_scanlines = lines;
+  Ym2149.SetSampleRate(prosystem_frequency, prosystem_scanlines);
 }
 
-function SetSampleRate(rate) { 
+function SetSampleRate(rate) {
   if (cartridge_bupchip) {
     rate = 31440;
   }
   console.log("Set sample rate: %d", rate);
   Pokey.SetSampleRate(rate);
+  Ym2149.SetSampleRate(rate);
   YM.setSampleRate(rate);
-  prosystem_sampleRate = rate; 
+  prosystem_sampleRate = rate;
 }
 
-function SetStoreSoundCallback(callback) { 
-  store_sound_callback = callback 
+function SetStoreSoundCallback(callback) {
+  store_sound_callback = callback
 }
 
 function OnCartridgeLoaded() {
   cartridge_pokey = Cartridge.IsPokeyEnabled();
+  cartridge_ym2149 = Cartridge.IsYm2149Enabled();
   cartridge_bupchip = Cartridge.IsBupChip();
 }
 

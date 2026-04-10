@@ -27,6 +27,7 @@ import * as WebMouse from "../web/mouse.js"
 import * as Region from "./Region.js"
 import * as Sound from "./Sound.js"
 import * as Pokey from "./Pokey.js"
+import * as Ym2149 from "./Ym2149.js"
 import * as Xm from "./Xm.js"
 import * as Memory from "./Memory.js"
 import * as Cartridge from "./Cartridge.js"
@@ -88,6 +89,7 @@ var maria_scanline = 1;
 
 /** Shadow of Cartridge */
 var cartridge_pokey = false;
+var cartridge_ym2149 = false;
 var cartridge_flags = 0;
 var cartridge_xm = false;
 var cartridge_hblank = 28;
@@ -120,6 +122,7 @@ function prosystem_Reset(postResetCallback) {
     Region.Reset();
     Tia.Clear();
     Pokey.Reset();
+    Ym2149.Reset();
     Xm.Reset();
 
     Memory.Reset();
@@ -354,6 +357,9 @@ function prosystem_ExecuteFrame(input) // TODO: input is array
     if (cartridge_pokey || cartridge_xm) {
       pokey_Process(2);
     }
+    if (cartridge_ym2149) {
+      Ym2149.Process(2);
+    }
 
     if (Cartridge.IsBupChip())
     {
@@ -474,6 +480,7 @@ function SetMstatAdjust(adjust) {
 
 function OnCartridgeLoaded() {
   cartridge_pokey = Cartridge.IsPokeyEnabled();
+  cartridge_ym2149 = Cartridge.IsYm2149Enabled();
   cartridge_xm = Cartridge.IsXmEnabled();
   // cartridge_flags = Cartridge.GetFlags();
   // cartridge_hblank = Cartridge.GetHblank();

@@ -120,6 +120,7 @@ var cartridge_banksets_end = 0;
 var cartridge_halt_banked_ram = false;
 var cartridge_pokey_write_only = false;
 var cartridge_pokey800 = false;
+var cartridge_ym2149 = false;
 
 /* SOUPER-specific stuff, used for "Rikki & Vikki" */
 var cartridge_bupchip = false;
@@ -334,6 +335,7 @@ function cartridge_ReadHeader(header) {
     cartridge_pokey_write_only = true;
   }
   cartridge_halt_banked_ram = header[53] & 0x40 ? true : false;
+  cartridge_ym2149 = (header[0] >= 4 && (header[66] & 0x40)) ? true : false;
   cartridge_bupchip = false;
 
   // Wii: Updates to header interpretation
@@ -891,6 +893,7 @@ function cartridge_Release() {
     cartridge_banksets = false;
     cartridge_pokey_write_only = false;
     cartridge_halt_banked_ram = false;
+    cartridge_ym2149 = false;
   }
 }
 
@@ -1010,6 +1013,10 @@ function IsDualAnalog() {
 
 function IsBupChip() {
   return cartridge_bupchip;
+}
+
+function IsYm2149Enabled() {
+  return cartridge_ym2149;
 }
 
 function IsLightGunEnabled() {
@@ -1201,6 +1208,7 @@ export {
   IsLightGunEnabled,
   IsComposite,
   IsBupChip,
+  IsYm2149Enabled,
   GetFlags,
   GetHblank,
   GetLeftSwitch,
