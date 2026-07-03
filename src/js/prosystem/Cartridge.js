@@ -335,7 +335,7 @@ function cartridge_ReadHeader(header) {
     cartridge_pokey_write_only = true;
   }
   cartridge_halt_banked_ram = header[53] & 0x40 ? true : false;
-  cartridge_ym2149 = (header[0] >= 4 && (header[66] & 0x40)) ? true : false;
+  cartridge_ym2149 = (header[0] >= 4 && ((header[66] << 8 | header[67]) === 0x0800)) ? true : false;
   cartridge_bupchip = false;
 
   // Wii: Updates to header interpretation

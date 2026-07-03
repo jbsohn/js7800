@@ -252,11 +252,10 @@ function memory_Write(address, data) {
     return;
   }
 
-  if (cartridge_ym2149 && (address == 0x4000 || address == 0x4001)) {
-    if (address == 0x4000) Ym2149.WriteAddress(data);
+  if (cartridge_ym2149 && (address == 0x0800 || address == 0x0801)) {
+    if (address == 0x0800) Ym2149.WriteAddress(data);
     else Ym2149.WriteData(data);
-    // If pokey is also at $4000, it doesn't get these two registers.
-    if (cartridge_pokey && !cartridge_pokey450 && !cartridge_pokey800) return;
+    return;
   }
 
   // banksets changes (pokey@800)
